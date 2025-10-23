@@ -1,10 +1,15 @@
-# main.py
+# main.py adaptado para Render Free con Flask
+from flask import Flask
 from crawler import crawl_site, SITES
 from scraper import get_price
 from db import init_db, get_product, upsert_price
 from telegram_bot import send_message
 from config import ANOMALY_FACTOR, RATE_LIMIT_SECONDS
 import time
+import threading
+import os
+
+app = Flask(__name__)
 
 def is_anomaly(url, price):
     row = get_product(url)
@@ -15,7 +20,6 @@ def is_anomaly(url, price):
     if count == 0:
         return False
     avg = sum_prices / count
-    # si price <= avg * ANOMALY_FACTOR => caída mayor al (1-ANOMALY_FACTOR)*100%
     return price <= avg * ANOMALY_FACTOR, avg
 
 def process_site(start_url):
@@ -33,14 +37,21 @@ def process_site(start_url):
             msg = f"⚠️ Posible error de precio\n{url}\nPrecio actual: {price}\nPrecio promedio: {avg:.2f}"
             print("ALERTA:", msg)
             send_message(msg)
-        # actualizar DB
         upsert_price(url, price)
         time.sleep(RATE_LIMIT_SECONDS)
 
-def main():
+def run_script():
     init_db()
     for site in SITES:
         process_site(site)
 
+# Ejecutar el script en un hilo separado para que Flask pueda iniciar
+threading.Thread(target=run_script).start()
+
+@app.route("/")
+def home():
+    return "Script ejecutándose en Render!"
+
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("PORT", 10000))  # Render asigna el puerto dinámicamente
+    app.run(host="0.0.0.0", port=port)
