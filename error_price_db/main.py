@@ -1,4 +1,4 @@
-# main.py adaptado para Render Free con Flask
+# main.py adaptado para Render Free con Flask y mensaje de inicio
 from flask import Flask
 from crawler import crawl_site, SITES
 from scraper import get_price
@@ -28,7 +28,11 @@ def process_site(start_url):
     print("Encontrados productos:", len(urls))
     for i, url in enumerate(urls):
         print(f"[{i+1}/{len(urls)}] Scraping:", url)
-        price = get_price(url)
+        try:
+            price = get_price(url)
+        except Exception as e:
+            print(f"Error al acceder a {url}: {e}")
+            continue
         if price is None:
             print("No se pudo leer precio")
             continue
@@ -42,6 +46,9 @@ def process_site(start_url):
 
 def run_script():
     init_db()
+    # Mensaje que se envía cada vez que se inicia todo
+    send_message("🚀 El scraping de precios se ha iniciado en Render!")
+    
     for site in SITES:
         process_site(site)
 
