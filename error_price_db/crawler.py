@@ -8,7 +8,6 @@ import time
 # Lista de dominios objetivo (ejemplos)
 SITES = [
     "https://www.falabella.com/falabella-cl/",
-    "https://www.sodimac.cl/sodimac-cl/",
     "https://www.lider.cl/",
     "https://simple.ripley.cl/",
     "https://www.paris.cl/"
