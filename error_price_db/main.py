@@ -25,6 +25,7 @@ def process_link(url):
     print("Crawling:", url)
     product_urls = crawl_site(url)
     print(f"Productos encontrados: {len(product_urls)}")
+    anomaly_flag = False
     for i, p_url in enumerate(product_urls):
         try:
             price = get_price(p_url)
@@ -34,13 +35,13 @@ def process_link(url):
             continue
         anomaly, avg = is_anomaly(p_url, price)
         if anomaly:
+            anomaly_flag = True
             msg = f"⚠️ Error de precio\n{p_url}\nPrecio actual: {price}\nPromedio: {avg:.2f}"
             print(msg)
             send_message(msg)
         upsert_price(p_url, price)
         time.sleep(RATE_LIMIT_SECONDS)
-    # Registrar historial
-    log_scrape(url, len(product_urls))
+    log_scrape(url, len(product_urls), anomaly_flag)
 
 def run_scraping_loop():
     while True:
@@ -75,15 +76,20 @@ def home():
     </ul>
     <h2>Historial reciente</h2>
     <table border="1">
-        <tr><th>Link</th><th>Productos revisados</th><th>Fecha</th></tr>
+        <tr><th>Link</th><th>Productos revisados</th><th>Anomalía</th><th>Fecha</th></tr>
         {% for h in history %}
-            <tr><td>{{ h.url }}</td><td>{{ h.product_count }}</td><td>{{ h.checked_at }}</td></tr>
+            <tr>
+                <td>{{ h.url }}</td>
+                <td>{{ h.product_count }}</td>
+                <td>{{ h.anomaly }}</td>
+                <td>{{ h.scraped_at }}</td>
+            </tr>
         {% endfor %}
     </table>
     """, links=links, history=history)
 
 if __name__ == "__main__":
     init_db()
-    send_message("🚀 Scraping iniciado en Render")
+    send_message("🚀 Scraping iniciado")
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

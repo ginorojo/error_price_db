@@ -8,6 +8,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
+    # Tabla de precios históricos
     cur.execute("""
     CREATE TABLE IF NOT EXISTS product_prices (
         url TEXT PRIMARY KEY,
@@ -16,18 +17,20 @@ def init_db():
         sum_prices NUMERIC DEFAULT 0
     );
     """)
+    # Tabla de links a revisar
     cur.execute("""
     CREATE TABLE IF NOT EXISTS links (
         url TEXT PRIMARY KEY
     );
     """)
-    # Historial actualizado
+    # Historial de scraping (con product_count)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS scrape_history (
         id SERIAL PRIMARY KEY,
         url TEXT,
-        product_count INTEGER,
-        checked_at TIMESTAMP DEFAULT NOW()
+        product_count INTEGER DEFAULT 0,
+        anomaly BOOLEAN DEFAULT FALSE,
+        scraped_at TIMESTAMP DEFAULT NOW()
     );
     """)
     conn.commit()
@@ -58,6 +61,7 @@ def upsert_price(url, price):
     cur.close()
     conn.close()
 
+# Funciones para la web
 def add_link(url):
     conn = get_conn()
     cur = conn.cursor()
@@ -75,12 +79,12 @@ def get_all_links():
     conn.close()
     return [r['url'] for r in rows]
 
-def log_scrape(url, product_count):
+def log_scrape(url, product_count, anomaly=False):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO scrape_history (url, product_count) VALUES (%s, %s)",
-        (url, product_count)
+        "INSERT INTO scrape_history (url, product_count, anomaly) VALUES (%s, %s, %s)",
+        (url, product_count, anomaly)
     )
     conn.commit()
     cur.close()
@@ -89,12 +93,10 @@ def log_scrape(url, product_count):
 def get_scrape_history(limit=50):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
-        SELECT url, product_count, checked_at
-        FROM scrape_history
-        ORDER BY checked_at DESC
-        LIMIT %s
-    """, (limit,))
+    cur.execute(
+        "SELECT url, product_count, anomaly, scraped_at FROM scrape_history ORDER BY scraped_at DESC LIMIT %s",
+        (limit,)
+    )
     rows = cur.fetchall()
     cur.close()
     conn.close()
