@@ -16,14 +16,12 @@ def detect_pattern(url):
     elif "lider.cl" in url:
         return "/producto/"
     else:
-        # patrón genérico si no se reconoce el dominio
         return "/product/"
-
 
 def crawl_site(start_url):
     """
-    Recorre una categoría y devuelve URLs de productos.
-    Detecta automáticamente el patrón según el dominio.
+    Recorre la categoría agregada y devuelve URLs de productos
+    detectando automáticamente el patrón según el dominio.
     """
     pattern_contains = detect_pattern(start_url)
     visited = set()
@@ -51,7 +49,6 @@ def crawl_site(start_url):
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Buscar todos los enlaces en la página
         for a in soup.find_all("a", href=True):
             href = a['href']
             full_url = urljoin(start_url, href)
@@ -65,7 +62,7 @@ def crawl_site(start_url):
                 url_clean = full_url.split('?')[0]
                 if url_clean not in product_urls:
                     product_urls.add(url_clean)
-                    print("🛒 Producto encontrado:", url_clean)
+                    print("🛒 Producto detectado:", url_clean)
             else:
                 if full_url not in visited and full_url not in to_visit:
                     to_visit.append(full_url)
@@ -74,5 +71,5 @@ def crawl_site(start_url):
             print("⛔ Máximo de páginas visitadas alcanzado, deteniendo crawl.")
             break
 
-    print(f"✅ Crawl terminado. Se encontraron {len(product_urls)} productos en {start_url}")
+    print(f"✅ Crawl terminado. Se detectaron {len(product_urls)} productos en {start_url}")
     return list(product_urls)

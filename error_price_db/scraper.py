@@ -1,67 +1,39 @@
-from playwright.sync_api import sync_playwright
-import re
-import time
-
-def parse_price_text(text):
-    if not text:
-        return None
-    m = re.search(r'([\d\.\,]{1,20})', text.replace('\xa0',' '))
-    if not m:
-        return None
-    s = m.group(1)
-    if s.count('.') > 1 and ',' not in s:
-        s = s.replace('.', '')
-    if ',' in s and s.count(',') == 1 and '.' not in s:
-        s = s.replace(',', '.')
-    s = s.replace(',', '').replace(' ', '')
-    try:
-        return float(s)
-    except:
-        return None
+import requests
+from bs4 import BeautifulSoup
 
 def get_price(url):
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(user_agent="Mozilla/5.0")
-        page = context.new_page()
-        try:
-            page.goto(url, timeout=20000, wait_until='networkidle')
-        except:
-            try:
-                page.goto(url, timeout=30000)
-            except:
-                browser.close()
-                return None
+    """
+    Obtiene el precio de un producto según la estructura del sitio.
+    Devuelve None si no se puede detectar.
+    """
+    try:
+        resp = requests.get(url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-        selectors = [
-            '[class*="price"]',
-            '[id*="price"]',
-            '[data-price]',
-            '.precio',
-            '.price',
-            '.prices',
-            '.product-price',
-            '.product__price'
-        ]
+        # Falabella
+        if "falabella.com" in url:
+            price_tag = soup.find("span", {"class": "fb-product-price__final"})
+            if price_tag:
+                price_str = price_tag.text.strip().replace("$","").replace(".","")
+                return float(price_str)
 
-        for sel in selectors:
-            try:
-                el = page.query_selector(sel)
-                if el:
-                    text = el.inner_text().strip()
-                    val = parse_price_text(text)
-                    if val:
-                        browser.close()
-                        return val
-            except:
-                continue
+        # Sodimac
+        elif "sodimac.cl" in url:
+            price_tag = soup.find("span", {"class": "product-price__price"})
+            if price_tag:
+                price_str = price_tag.text.strip().replace("$","").replace(".","")
+                return float(price_str)
 
-        html = page.content()
-        m = re.search(r'\$[\s]*([\d\.,]+)', html)
-        if m:
-            val = parse_price_text(m.group(1))
-            browser.close()
-            return val
+        # Lider
+        elif "lider.cl" in url:
+            price_tag = soup.find("span", {"class": "price"})
+            if price_tag:
+                price_str = price_tag.text.strip().replace("$","").replace(".","")
+                return float(price_str)
 
-        browser.close()
+        return None
+    except Exception as e:
+        print("❌ Error al obtener precio:", url, e)
         return None

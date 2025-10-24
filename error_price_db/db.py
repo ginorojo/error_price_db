@@ -8,7 +8,7 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
-    # Tabla de precios históricos
+    # Tabla de productos
     cur.execute("""
     CREATE TABLE IF NOT EXISTS product_prices (
         url TEXT PRIMARY KEY,
@@ -17,19 +17,19 @@ def init_db():
         sum_prices NUMERIC DEFAULT 0
     );
     """)
-    # Tabla de links a revisar
+    # Tabla de links (categorías)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS links (
         url TEXT PRIMARY KEY
     );
     """)
-    # Historial de scraping (con product_count)
+    # Historial de scrapes
     cur.execute("""
     CREATE TABLE IF NOT EXISTS scrape_history (
         id SERIAL PRIMARY KEY,
         url TEXT,
-        product_count INTEGER DEFAULT 0,
-        anomaly BOOLEAN DEFAULT FALSE,
+        price NUMERIC,
+        anomaly BOOLEAN,
         scraped_at TIMESTAMP DEFAULT NOW()
     );
     """)
@@ -37,6 +37,7 @@ def init_db():
     cur.close()
     conn.close()
 
+# Productos
 def get_product(url):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -61,11 +62,19 @@ def upsert_price(url, price):
     cur.close()
     conn.close()
 
-# Funciones para la web
+# Links
 def add_link(url):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("INSERT INTO links (url) VALUES (%s) ON CONFLICT DO NOTHING", (url,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def delete_link(url):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM links WHERE url=%s", (url,))
     conn.commit()
     cur.close()
     conn.close()
@@ -79,13 +88,11 @@ def get_all_links():
     conn.close()
     return [r['url'] for r in rows]
 
-def log_scrape(url, product_count, anomaly=False):
+# Historial
+def log_scrape(url, price=None, anomaly=False):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO scrape_history (url, product_count, anomaly) VALUES (%s, %s, %s)",
-        (url, product_count, anomaly)
-    )
+    cur.execute("INSERT INTO scrape_history (url, price, anomaly) VALUES (%s,%s,%s)", (url, price, anomaly))
     conn.commit()
     cur.close()
     conn.close()
@@ -93,10 +100,12 @@ def log_scrape(url, product_count, anomaly=False):
 def get_scrape_history(limit=50):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(
-        "SELECT url, product_count, anomaly, scraped_at FROM scrape_history ORDER BY scraped_at DESC LIMIT %s",
-        (limit,)
-    )
+    cur.execute("""
+        SELECT url, price, anomaly, scraped_at 
+        FROM scrape_history 
+        ORDER BY scraped_at DESC 
+        LIMIT %s
+    """, (limit,))
     rows = cur.fetchall()
     cur.close()
     conn.close()
