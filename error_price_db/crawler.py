@@ -1,22 +1,13 @@
-# crawler.py
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from config import RATE_LIMIT_SECONDS, MAX_PRODUCTS
 import time
 
-# Lista de dominios objetivo (ejemplos)
-SITES = [
-    "https://www.falabella.com/falabella-cl/",
-    "https://www.lider.cl/",
-    "https://simple.ripley.cl/",
-    "https://www.paris.cl/"
-]
-
 def crawl_site(start_url, pattern_contains="/product/"):
     """
-    Crawl simple: recorre enlaces internos y devuelve URLs que contienen pattern_contains.
-    NOTA: no es un crawler perfecto (no sigue robots.txt) — úsalo con moderación.
+    Crawl avanzado: recorre enlaces internos y devuelve URLs que contienen pattern_contains.
+    Soporta páginas de categoría para obtener todos los productos.
     """
     visited = set()
     to_visit = [start_url]
@@ -37,23 +28,22 @@ def crawl_site(start_url, pattern_contains="/product/"):
         soup = BeautifulSoup(resp.text, "html.parser")
         for a in soup.find_all("a", href=True):
             href = a['href']
-            full = urljoin(start_url, href)
+            full_url = urljoin(start_url, href)
 
-            # filtrar urls internas
-            if not full.startswith(start_url):
+            if not full_url.startswith(start_url):
                 continue
 
-            # si parece url de producto, guardarla
-            if pattern_contains in full:
-                url_clean = full.split('?')[0]  # quitar query params
-                product_urls.add(url_clean)
-                print("Producto encontrado:", url_clean)  # <-- depuración
+            # URLs de producto
+            if pattern_contains in full_url:
+                url_clean = full_url.split('?')[0]
+                if url_clean not in product_urls:
+                    product_urls.add(url_clean)
+                    print("Producto encontrado:", url_clean)
             else:
-                if full not in visited:
-                    to_visit.append(full)
+                if full_url not in visited and full_url not in to_visit:
+                    to_visit.append(full_url)
 
-        # seguridad: no sobre-explorar
-        if len(visited) > 2000:
+        if len(visited) > 3000:
             print("Máximo de páginas visitadas alcanzado, deteniendo crawl.")
             break
 
